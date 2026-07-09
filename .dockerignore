@@ -1,0 +1,9 @@
+node_modules
+.git
+.github
+.Rhistory
+npm-debug.log
+*.local
+*.tmp
+*.bak
+coverage
