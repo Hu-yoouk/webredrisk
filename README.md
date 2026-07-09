@@ -1,73 +1,163 @@
-# React + TypeScript + Vite
+# WebRedRisk：海洋赤潮风险评估与可视化预警系统
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+WebRedRisk 是面向“数据要素素质大赛”赤潮项目构建的可视化预警网站。系统围绕论文中的多源数据整合、空间分辨赤潮标签、LightGBM+TCN+CNN 两层融合模型和 REWS 赤潮预警评分体系展开，将建模结果转化为可浏览、可对比、可解释、可部署的交互式网站。
 
-Currently, two official plugins are available:
+本项目的重点不是单纯展示静态图表，而是把“数据-模型-预警-解释-报告”连成一条完整业务链路：用户可以查看东海研究区的历史赤潮样本、环境因子时序、空间风险分布、模型性能、特征贡献和综合分析报告，从而理解赤潮风险判断的来源与依据。
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 一、系统定位
 
-## React Compiler
+系统服务于东海长江入海口及邻近海域赤潮风险评估，研究范围为：
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- 经度：120.5°E--123.5°E
+- 纬度：29.0°N--32.5°N
+- 时间：2004 年 1 月至 2023 年 12 月
+- 空间单元：195 个 0.25° × 0.25° 网格
+- 样本规模：46,800 条逐月网格样本
 
-## Expanding the ESLint configuration
+网站展示的数据来自项目已整理的 JSON 数据文件，覆盖海表温度、叶绿素 a、盐度、硝酸盐、磷酸盐、硅酸盐、风速、气压、太阳辐射、降水、赤潮标签、赤潮面积和优势种等信息。
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## 二、技术架构概览
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+本系统采用轻量化前后端分离架构。
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+| 层级 | 技术/文件 | 作用 |
+|---|---|---|
+| 前端展示层 | React 19、TypeScript、Vite、Tailwind CSS | 页面组织、交互控制、状态展示 |
+| 可视化层 | ECharts、Leaflet、React-Leaflet | 图表绘制、空间地图、趋势分析 |
+| 数据服务层 | Nginx 静态服务、JSON 文件 | 向前端提供 stats、geo_data、time_series、samples 等数据 |
+| 数据处理层 | SQLite、Node.js 导出脚本、建模管线输出 | 将数据库和模型结果整理为前端可加载的数据 |
+| 部署层 | Docker、Docker Compose、Nginx | 服务器部署、静态资源托管、健康检查 |
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+需要说明的是，当前版本的“后端”不是传统常驻 API 服务，而是由“离线数据处理脚本 + JSON 静态数据服务 + Nginx 托管”组成。这种设计更适合竞赛展示和服务器快速部署：稳定、轻量、依赖少，服务器端不需要数据库常驻运行。
+
+## 三、功能模块
+
+系统共包含 11 个主要页面：
+
+| 页面 | 功能 |
+|---|---|
+| 项目总览 | 展示样本规模、监测网格、时间范围、赤潮风险概况和核心指标 |
+| 数据处理 | 分页浏览 46,800 条样本，展示数据清洗、分页加载和字段结构 |
+| 风险地图 | 基于 Leaflet 展示研究海域网格风险空间分布 |
+| 风险预测 | 根据环境因子输入给出风险评分、风险等级和主要影响因子 |
+| 模型评估 | 展示 LightGBM、TCN、CNN 和 Stacking 融合模型的性能对比 |
+| 预测对比 | 对比历史风险、环境变量和预测结果之间的关系 |
+| 未来趋势 | 展示历史时间序列与风险趋势，用于观察季节性变化 |
+| 特征分析 | 展示环境因子重要性、贡献度和模型解释结果 |
+| 分析报告 | 汇总数据、模型、风险和解释信息，形成可汇报页面 |
+| 相关分析 | 展示环境因子之间的相关性矩阵和变量关系 |
+| 数据导入 | 支持 CSV/JSON 数据导入，用于扩展展示和测试 |
+
+## 四、目录结构
+
+```text
+webredrisk/
+├── dist/                         # 生产构建产物，可直接部署到 Nginx
+├── public/
+│   └── data/                     # 前端静态 JSON 数据
+├── src/
+│   ├── components/               # 通用布局、侧栏、卡片、风险标签
+│   ├── pages/                    # 11 个功能页面
+│   ├── services/                 # 数据加载与状态上下文
+│   ├── utils/                    # 风险评分等工具函数
+│   └── types/                    # TypeScript 类型定义
+├── scripts/
+│   ├── export-data.cjs           # SQLite 到 JSON 的数据导出脚本
+│   ├── deploy.sh                 # Linux Docker 部署脚本
+│   ├── stop.sh                   # Linux 停止脚本
+│   └── deploy.ps1                # Windows 部署脚本
+├── nginx/default.conf            # Nginx 静态站配置
+├── Dockerfile                    # 使用已有 dist 的生产镜像
+├── Dockerfile.build              # 在容器内重新构建源码的镜像
+├── docker-compose.yml            # 一键部署配置
+├── README.md                     # 项目说明
+└── docs/                         # 系统架构、功能、数据与模型说明
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## 五、本地运行
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+安装 Node.js 18 或 20 后执行：
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev
 ```
+
+默认访问：
+
+```text
+http://localhost:5173/red-tide-risk/
+```
+
+## 六、生产构建
+
+```bash
+npm run build
+```
+
+构建产物会输出到：
+
+```text
+dist/
+```
+
+由于 `vite.config.ts` 中配置了：
+
+```ts
+base: '/red-tide-risk/'
+```
+
+因此生产环境建议通过以下路径访问：
+
+```text
+http://服务器IP/red-tide-risk/
+```
+
+若要部署在域名根路径，需要将 `base` 改为 `/` 后重新构建。
+
+## 七、Docker 部署
+
+服务器安装 Docker 后执行：
+
+```bash
+docker compose up -d --build
+```
+
+默认端口为 8080：
+
+```text
+http://服务器IP:8080/red-tide-risk/
+```
+
+健康检查：
+
+```text
+http://服务器IP:8080/healthz
+```
+
+停止服务：
+
+```bash
+docker compose down
+```
+
+## 八、与论文的对应关系
+
+| 论文内容 | 网站体现 |
+|---|---|
+| 多源数据整合 | 数据处理、项目总览、数据导入 |
+| 空间分辨标签 | 风险地图、样本网格展示 |
+| LightGBM 静态分类模型 | 特征分析、模型评估 |
+| TCN 时间修正模型 | 未来趋势、预测对比、模型评估 |
+| Spatial-CNN 空间修正模型 | 风险地图、模型评估 |
+| 两层 Stacking 融合 | 模型评估、风险预测 |
+| REWS 预警评分 | 风险预测、风险地图、分析报告 |
+| 应用价值分析 | 分析报告、可视化汇总页面 |
+
+## 九、推荐阅读顺序
+
+1. `README.md`：了解项目用途和快速部署。
+2. `docs/系统架构与功能说明.md`：了解前端、后端、数据层和功能模块。
+3. `docs/数据与模型口径说明.md`：了解网站与论文模型、数据口径的对应关系。
+4. `README_服务器部署.md`：部署到服务器时查看。
+5. `部署检查清单.md`：上线前核对文件完整性。
